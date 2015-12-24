@@ -1,0 +1,215 @@
+---
+title: "PML course Project"
+author: "Klajdi Qirko"
+date: "December 24, 2015"
+output:
+  html_document:
+    keep_md: yes
+  pdf_document:
+    keep_tex: yes
+---
+
+**Background Information** 
+=========================================================
+Using devices such as Jawbone Up, Nike FuelBand, and Fitbit it is now possible to collect a large amount of data about personal activity relatively inexpensively. These type of devices are part of the quantified self movement ??? a group of enthusiasts who take measurements about themselves regularly to improve their health, to find patterns in their behavior, or because they are tech geeks. One thing that people regularly do is quantify how much of a particular activity they do, but they rarely quantify how well they do it. In this project, your goal will be to use data from accelerometers on the belt, forearm, arm, and dumbell of 6 participants. They were asked to perform barbell lifts correctly and incorrectly in 5 different ways. More information is available from the website here: <http://groupware.les.inf.puc-rio.br/har> (see the section on the Weight Lifting Exercise Dataset).
+
+**Data Processing**
+====================================
+### 1.**Getting and Loading the Data**
+```{r, message = FALSE, eval = TRUE}
+# load the required packages
+library(caret); library(rattle); library(rpart); library(rpart.plot)
+library(randomForest);
+```
+
+```{r, eval = TRUE}
+# Getting the data (on the memory)
+# training data url
+trainUrl <- "http://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv"
+#testing data url
+testUrl <- "http://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv"
+# loading the data
+training <- read.csv(url(trainUrl), na.strings = c("NA","#DIV/0!",""))
+testing <- read.csv(url(testUrl), na.strings=c("NA","#DIV/0!",""))
+```
+
+```{r, echo = FALSE, eval = FALSE}
+# Getting the data (on disk and then loading them)
+
+# fileDir <- "/Users/klajdiqirko/Dropbox/Coursera/CourseraMachineLearning/PracticalMachineLearningwithR"
+#getDataFiles <- function(filesDirectory = fileDir) { 
+#        if (!file.exists(filesDirectory)) {
+#      dir.create(filesDirectory)
+#           }
+#        testUrl <- "http://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv"
+#        trainUrl <- "http://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv"
+#        trainFile <- "train.csv"
+#        testFile <- "test.csv"
+#        trainFilePath <- paste(filesDirectory, trainFile, sep = "/")
+#        testFilePath <- paste(filesDirectory, testFile, sep = "/")
+#        download.file(trainUrl, destfile = trainFilePath, method="curl")
+#        download.file(testUrl, destfile = testFilePath, method="curl")
+#        training <- read.csv(trainFilePath, na.strings=c("NA","#DIV/0!",""))
+#        testing <- read.csv(testFilePath, na.strings=c("NA","#DIV/0!",""))
+#        }
+# getDatafiles()
+```
+### 2.**Split the training set**
+```{r}
+inTR <- createDataPartition(y = training$classe, p = 0.6, list = FALSE)
+train <- training[inTR,]
+probe <- training[-inTR,]
+# splitting the probe set into validation set and test set
+intst <- createDataPartition(y = probe$classe, p = 0.5, list = FALSE)
+validation <- probe[-intst,]
+TRtest <- probe[intst,]
+```
+### 3.**Exploratory Data Analysis**
+We run a summary on the data to have an overall look! I am holding the output since it is very long and displaying it at the end of the data.
+```{r, hold = TRUE}
+summary(training)
+```
+From the summary we see that many columns have many missing values and they consist only of the statistcs for data that are in other columns(average, standard dev, curtosis). Since a large number of the values is NA we will have to remove this columns when we build the predictive model. We also notice that the first 7 columns will not help withe prediction at all. Before we remove all this columns we subset the data by taking the data values that correspond to only one of the volunteers which i chose to be pedro. We do this to be able to do some exploration that will help us detect which of the variables have bigger contribution in describing the variation of the data and therefore will help us in our classification algorithm.
+```{r}
+trainpedro <- subset(train, user_name == "pedro")
+# looking at a plot of one of the variables that might be very important.
+with(trainpedro, plot(roll_arm, col = classe))
+legend("bottomright", legend = unique(trainpedro$classe), col = unique(trainpedro$classe), pch = 1)
+```
+
+We see that the roll_arm variable explains some variation in the classes A,B and E. Thus, this is a good indication that it should be included as a predictor. We need a deeper analysis now on determining the other variables. First thing we do is get rid of the variables that were not helpful as explained above. This is what the following code accomplishes.
+```{r}
+# calculating the total number of NA per column.
+totna = apply(trainpedro, 2, function(col) sum(is.na(col)))
+# vector with the first 7 column numbers that we will use to take them out of our train set.
+out = c(1:7)
+# Since the columns that we will use have no NAs we can use as subsetting rule the zero values of
+# the totna vector. We make 1 the entries for the first 7 columns since we will not keep them either.
+totna[out] = 1
+trainpedro <- trainpedro[, totna == 0]
+
+# Now we apply the same subsetting for all the other data sets.
+train <- train[, totna == 0]
+validation <- validation[, totna == 0]
+TRtest <- TRtest[, totna == 0]
+testing <- testing[, totna == 0]
+# checking that we have the same number of variables for all sets
+dim(train); dim(validation); dim(TRtest); dim(testing)
+```
+Now we can run a svd decopmposition on the data and find out the max. contributor from the first 4 right singular vectors and their corresponding variable names.
+``` {r}
+svd1 <- svd(scale(trainpedro[,-53]))
+maxContrib <- apply(svd1$v[,1:4], 2,  which.max)
+# plotting the biggest contributor features 
+featurePlot(x = trainpedro[,names(trainpedro)[maxContrib]], y = trainpedro$classe, plot = "pairs", auto.key = list(space = "left") )
+```
+
+From the plot we can clearly see that even though these features explain some of the variablity in tha data we still do not capture the separation of the groups.
+
+### 4.**Feature Selection**
+The next apporoach is to do a K-means clustering and find out what features are the most influential when determining the centers of the 5 classes.
+
+```{r}
+kclust <- kmeans(trainpedro[,-53], centers = 5, nstart = 100,iter.max = 100)
+# checking if the clustering is separating the groups
+table(kclust$cluster, trainpedro$classe)
+```
+We can see that the clustering has trouble separating the points into the 5 classes.
+Now we order the cluster center values and pick the highest 20 so that we can subset the number of features to use for the prediction function but still have a good representative subset that captures most of the variation in the data. I am suppressing the output of the code since i will get 5 different lists of features (for each class the biggest center contributors) and combine them to get 1 final set of features.
+```{r}
+Acenters <- abs(kclust$center[1,])
+A <- colnames(trainpedro[order(Acenters, decreasing = TRUE)[1:20]])
+Bcenters <- abs(kclust$center[2,])
+B <- colnames(trainpedro[order(Bcenters, decreasing = TRUE)[1:20]])
+Ccenters <- abs(kclust$center[3,])
+C <- colnames(trainpedro[order(Ccenters, decreasing = TRUE)[1:20]])
+Dcenters <- abs(kclust$center[4,])
+D <- colnames(trainpedro[order(Dcenters, decreasing = TRUE)[1:20]])
+Ecenters <- abs(kclust$center[5,])
+E <- colnames(trainpedro[order(Ecenters, decreasing = TRUE)[1:20]])
+```
+After examining the lists we get the union of features and add two max contributors found before that are not on the list. Qe should not forget to add the variable we want to predict.
+```{r}
+ABCDE <- c(A, "accel_arm_x", "accel_forearm_x", "magnet_belt_z","total_accel_belt", "total_accel_dumbbell", "classe" )
+# checking the number of features
+length(ABCDE)
+```
+### **Final subsetting of the data**
+```{r}
+train <- train[,ABCDE]
+validation <- validation[,ABCDE]
+TRtest <- TRtest[,ABCDE]
+testing <- testing[,c(ABCDE[-26],"problem_id")]
+```
+
+** Building the Prediction Models**
+We will build 3 different prediction models, one using the random forest algorithm, one using boosting with trees and the last one using support vector machines with radial basis function kernel. We should not forget to set the seed so that we get the same subsets when applying cross-validation during the training of the models. Notice we are using the trainControl function to set the cross validation method to repeated cv with 10 resamples and 5 repetitions. Iran it and it takes very long for all three algorithms to run. Thus for the sake of the assignment i will run it with just 5 reamples and 3 repetititions. I am commenting out svm since it takes 2 days to run. For the third method i will use is trees.
+```{r, message = FALSE}
+# fitcontrol parameters are going to be used for all three methods to make it possible for us to fairly compare them.
+set.seed(2212)
+#fitcontrol <- trainControl(method = "repeatedcv", number = 10, repeats = 5,classProbs = TRUE)
+fitcontrol <- trainControl(method = "repeatedcv", number = 5, repeats = 1,classProbs = TRUE)
+rf <- randomForest(classe~., data = train, trcontrol = fitcontrol, ntree = 300, importance= TRUE, proximity = TRUE)
+set.seed(2212)
+#svm <- train(classe~., data = train, trControl = fitcontrol, method = "svmRadial", verbose = #FALSE,
+#              preProc = c("center", "scale"),tunelength = 8 )
+treefit <- train(classe ~., data = train, method ="rpart")
+set.seed(2212)
+gbm <- train(classe~., data = train, trControl = fitcontrol, method = "gbm", verbose = FALSE,
+              preProc = c("center", "scale"))
+```
+Checking the models and which one has the best accuracy:
+
+**Prediction wiht Decision Trees**
+
+```{r}
+cMtree <- confusionMatrix(validation$classe, predict(treefit, validation))
+cMtree
+fancyRpartPlot(treefit$finalModel)
+```
+
+We can see that using the reduced number of predictors, when using Desicion Trees we fail to classify into the C and D classes completely. Nonetheless we will see that using the other two methods even with the reduced number of predictors we can still get very good predictions.
+
+**Prediction with Random Forest**
+
+```{r}
+cMrf <- confusionMatrix(validation$classe, predict(rf, validation))
+cMrf
+```
+
+We see that we get a very high accuracy level using the Random Forest algorithm but we have to be careful that we are not overfitting. To check this we need to check the out of sample error for all three methods and choose the one with the lowest out of sample error. This is the reason i have split the training set into three subsets, so that we can apply the 2 best methods to the TRtest set and compare the Out of Sample Error. Now let us check the last prediction model.
+
+** Prediction with the Gradient Boosting Method**
+
+```{r}
+cMgbm <- confusionMatrix(validation$classe, predict(gbm, validation))
+cMgbm
+```
+
+The expected OSE for the three methods are: Tree:`r 1 - cMtree$overall[[1]]`, 
+rf:`r 1 - cMrf$overall[[1]]`, gbm: `r 1 - cMgbm$overall[[1]]`.
+From this preliminary OSE The Random Forest prediction model has the lowest Out Of Sample Error. 
+The final estimates for the OSE will be computed after we apply these 2 models on the TRtest.
+```{r}
+cMfrf <- confusionMatrix(TRtest$classe, predict(rf, TRtest))
+cMfrf
+cMfgbm <- confusionMatrix(TRtest$classe, predict(gbm, TRtest))
+cMfgbm
+```
+
+Out of Sample Error Estimates: rf:`r 1 - cMfrf$overall[[1]]`, gbm: `r 1 - cMfgbm$overall[[1]]`.
+We can see that the most accurate model is the Random Forest model. We are going to use it to predict the class for the test set.
+
+# ** Test Predictions **
+```{r}
+predictrf <- predict(rf, testing)
+predictrf
+predictgbm <- predict(gbm, testing)
+```
+
+Finally we check if the predictions from the two algorithms are the same.
+
+```{r}
+table(predictrf,predictgbm)
+```
+We can see that the predicted values differ in the B, C, D classes which tells that these three classes are the hardest to separate accurately. Nontheless both the algorithms created very good approximating models.
