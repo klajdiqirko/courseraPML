@@ -4,7 +4,7 @@ December 24, 2015
 
 **Background Information** 
 =========================================================
-Using devices such as Jawbone Up, Nike FuelBand, and Fitbit it is now possible to collect a large amount of data about personal activity relatively inexpensively. These type of devices are part of the quantified self movement ??? a group of enthusiasts who take measurements about themselves regularly to improve their health, to find patterns in their behavior, or because they are tech geeks. One thing that people regularly do is quantify how much of a particular activity they do, but they rarely quantify how well they do it. In this project, your goal will be to use data from accelerometers on the belt, forearm, arm, and dumbell of 6 participants. They were asked to perform barbell lifts correctly and incorrectly in 5 different ways. More information is available from the website here: <http://groupware.les.inf.puc-rio.br/har> (see the section on the Weight Lifting Exercise Dataset).
+Using devices such as Jawbone Up, Nike FuelBand, and Fitbit it is now possible to collect a large amount of data about personal activity relatively inexpensively. These type of devices are part of the quantified self movement ??? a group of enthusiasts who take measurements about themselves regularly to improve their health, to find patterns in their behavior, or because they are tech geeks. One thing that people regularly do is quantify how much of a particular activity they do, but they rarely quantify how well they do it. In this project, your goal will be to use data from accelerometers on the belt, forearm, arm, and dumbbell of 6 participants. They were asked to perform barbell lifts correctly and incorrectly in 5 different ways. More information is available from the website here: <http://groupware.les.inf.puc-rio.br/har> (see the section on the Weight Lifting Exercise Dataset).
 
 **Data Processing**
 ====================================
@@ -417,7 +417,7 @@ summary(training)
 ##          
 ## 
 ```
-From the summary we see that many columns have many missing values and they consist only of the statistcs for data that are in other columns(average, standard dev, curtosis). Since a large number of the values is NA we will have to remove this columns when we build the predictive model. We also notice that the first 7 columns will not help withe prediction at all. Before we remove all this columns we subset the data by taking the data values that correspond to only one of the volunteers which i chose to be pedro. We do this to be able to do some exploration that will help us detect which of the variables have bigger contribution in describing the variation of the data and therefore will help us in our classification algorithm.
+From the summary we see that many columns have many missing values and they consist only of the statistics for data that are in other columns(average, standard dev, curtosis). Since a large number of the values is NA we will have to remove this columns when we build the predictive model. We also notice that the first 7 columns will not help withe prediction at all. Before we remove all this columns we subset the data by taking the data values that correspond to only one of the volunteers which i chose to be pedro. We do this to be able to do some exploration that will help us detect which of the variables have bigger contribution in describing the variation of the data and therefore will help us in our classification algorithm.
 
 ```r
 trainpedro <- subset(train, user_name == "pedro")
@@ -464,7 +464,7 @@ dim(train); dim(validation); dim(TRtest); dim(testing)
 ```
 ## [1] 20 53
 ```
-Now we can run a svd decopmposition on the data and find out the max. contributor from the first 4 right singular vectors and their corresponding variable names.
+Now we can run a svd decomposition on the data and find out the max. contributor from the first 4 right singular vectors and their corresponding variable names.
 
 ```r
 svd1 <- svd(scale(trainpedro[,-53]))
@@ -475,10 +475,10 @@ featurePlot(x = trainpedro[,names(trainpedro)[maxContrib]], y = trainpedro$class
 
 ![](PMLproj_files/figure-html/unnamed-chunk-8-1.png) 
 
-From the plot we can clearly see that even though these features explain some of the variablity in tha data we still do not capture the separation of the groups.
+From the plot we can clearly see that even though these features explain some of the variability in the data we still do not capture the separation of the groups.
 
 ### 4.**Feature Selection**
-The next apporoach is to do a K-means clustering and find out what features are the most influential when determining the centers of the 5 classes.
+The next approach is to do a K-means clustering and find out what features are the most influential when determining the centers of the 5 classes.
 
 
 ```r
@@ -490,11 +490,11 @@ table(kclust$cluster, trainpedro$classe)
 ```
 ##    
 ##       A   B   C   D   E
-##   1 196  91 134   8 126
-##   2   0  51  23  32  45
-##   3  55  46   0  64  53
-##   4  87  48 150 115  35
-##   5  32  72   4  63  50
+##   1  90  40 141  98  39
+##   2 194  92 113   7 119
+##   3  30  79   5  81  46
+##   4   0  51  26  29  44
+##   5  54  39   0  67  50
 ```
 We can see that the clustering has trouble separating the points into the 5 classes.
 Now we order the cluster center values and pick the highest 20 so that we can subset the number of features to use for the prediction function but still have a good representative subset that captures most of the variation in the data. I am suppressing the output of the code since i will get 5 different lists of features (for each class the biggest center contributors) and combine them to get 1 final set of features.
@@ -511,7 +511,7 @@ D <- colnames(trainpedro[order(Dcenters, decreasing = TRUE)[1:20]])
 Ecenters <- abs(kclust$center[5,])
 E <- colnames(trainpedro[order(Ecenters, decreasing = TRUE)[1:20]])
 ```
-After examining the lists we get the union of features and add two max contributors found before that are not on the list. Qe should not forget to add the variable we want to predict.
+After examining the lists we get the union of features and add two max contributors found before that are not on the list. We should not forget to add the variable we want to predict.
 
 ```r
 ABCDE <- c(A, "accel_arm_x", "accel_forearm_x", "magnet_belt_z","total_accel_belt", "total_accel_dumbbell", "classe" )
@@ -531,8 +531,8 @@ TRtest <- TRtest[,ABCDE]
 testing <- testing[,c(ABCDE[-26],"problem_id")]
 ```
 
-** Building the Prediction Models**
-We will build 3 different prediction models, one using the random forest algorithm, one using boosting with trees and the last one using support vector machines with radial basis function kernel. We should not forget to set the seed so that we get the same subsets when applying cross-validation during the training of the models. Notice we are using the trainControl function to set the cross validation method to repeated cv with 10 resamples and 5 repetitions. Iran it and it takes very long for all three algorithms to run. Thus for the sake of the assignment i will run it with just 5 reamples and 3 repetititions. I am commenting out svm since it takes 2 days to run. For the third method i will use is trees.
+**Building the Prediction Models**
+We will build 3 different prediction models, one using the random forest algorithm, one using boosting with trees and the last one using support vector machines with radial basis function kernel. We should not forget to set the seed so that we get the same subsets when applying cross-validation during the training of the models. Notice we are using the trainControl function to set the cross validation method to repeated cv with 10 resamples and 5 repetitions. Iran it and it takes very long for all three algorithms to run. Thus for the sake of the assignment i will run it with just 5 resamples and 3 repetitions. I am commenting out svm since it takes 2 days to run. For the third method i will use is trees.
 
 ```r
 # fitcontrol parameters are going to be used for all three methods to make it possible for us to fairly compare them.
@@ -562,34 +562,34 @@ cMtree
 ## Confusion Matrix and Statistics
 ## 
 ##           Reference
-## Prediction   A   B   C   D   E
-##          A 999   0 114   0   3
-##          B 509   0 250   0   0
-##          C 335   0 349   0   0
-##          D 389   0 254   0   0
-##          E 148   0 249   0 324
+## Prediction    A    B    C    D    E
+##          A 1005    0  110    0    1
+##          B  521    0  238    0    0
+##          C  333    0  351    0    0
+##          D  416    0  227    0    0
+##          E  162    0  235    0  324
 ## 
 ## Overall Statistics
 ##                                           
-##                Accuracy : 0.4262          
-##                  95% CI : (0.4107, 0.4419)
-##     No Information Rate : 0.6067          
+##                Accuracy : 0.4282          
+##                  95% CI : (0.4127, 0.4439)
+##     No Information Rate : 0.6212          
 ##     P-Value [Acc > NIR] : 1               
 ##                                           
-##                   Kappa : 0.2431          
+##                   Kappa : 0.2442          
 ##  Mcnemar's Test P-Value : NA              
 ## 
 ## Statistics by Class:
 ## 
 ##                      Class: A Class: B Class: C Class: D Class: E
-## Sensitivity            0.4197       NA  0.28701       NA  0.99083
-## Specificity            0.9242   0.8065  0.87625   0.8361  0.88960
-## Pos Pred Value         0.8952       NA  0.51023       NA  0.44938
-## Neg Pred Value         0.5080       NA  0.73232       NA  0.99906
-## Prevalence             0.6067   0.0000  0.30997   0.0000  0.08335
-## Detection Rate         0.2547   0.0000  0.08896   0.0000  0.08259
+## Sensitivity            0.4124       NA  0.30233       NA  0.99692
+## Specificity            0.9253   0.8065  0.87944   0.8361  0.88966
+## Pos Pred Value         0.9005       NA  0.51316       NA  0.44938
+## Neg Pred Value         0.4898       NA  0.74992       NA  0.99969
+## Prevalence             0.6212   0.0000  0.29595   0.0000  0.08284
+## Detection Rate         0.2562   0.0000  0.08947   0.0000  0.08259
 ## Detection Prevalence   0.2845   0.1935  0.17436   0.1639  0.18379
-## Balanced Accuracy      0.6720       NA  0.58163       NA  0.94021
+## Balanced Accuracy      0.6688       NA  0.59088       NA  0.94329
 ```
 
 ```r
@@ -613,38 +613,38 @@ cMrf
 ## 
 ##           Reference
 ## Prediction    A    B    C    D    E
-##          A 1115    0    1    0    0
-##          B    6  743    7    2    1
-##          C    0    6  676    2    0
-##          D    1    2   23  615    2
-##          E    0    0    0    5  716
+##          A 1106    0    4    6    0
+##          B    8  747    3    1    0
+##          C    1    3  677    3    0
+##          D    2    0   11  630    0
+##          E    0    2    5    4  710
 ## 
 ## Overall Statistics
 ##                                           
-##                Accuracy : 0.9852          
-##                  95% CI : (0.9809, 0.9888)
-##     No Information Rate : 0.286           
+##                Accuracy : 0.9865          
+##                  95% CI : (0.9824, 0.9899)
+##     No Information Rate : 0.2847          
 ##     P-Value [Acc > NIR] : < 2.2e-16       
 ##                                           
-##                   Kappa : 0.9813          
+##                   Kappa : 0.9829          
 ##  Mcnemar's Test P-Value : NA              
 ## 
 ## Statistics by Class:
 ## 
 ##                      Class: A Class: B Class: C Class: D Class: E
-## Sensitivity            0.9938   0.9893   0.9562   0.9856   0.9958
-## Specificity            0.9996   0.9950   0.9975   0.9915   0.9984
-## Pos Pred Value         0.9991   0.9789   0.9883   0.9565   0.9931
-## Neg Pred Value         0.9975   0.9975   0.9904   0.9973   0.9991
-## Prevalence             0.2860   0.1914   0.1802   0.1591   0.1833
-## Detection Rate         0.2842   0.1894   0.1723   0.1568   0.1825
+## Sensitivity            0.9902   0.9934   0.9671   0.9783   1.0000
+## Specificity            0.9964   0.9962   0.9978   0.9960   0.9966
+## Pos Pred Value         0.9910   0.9842   0.9898   0.9798   0.9847
+## Neg Pred Value         0.9961   0.9984   0.9929   0.9957   1.0000
+## Prevalence             0.2847   0.1917   0.1784   0.1642   0.1810
+## Detection Rate         0.2819   0.1904   0.1726   0.1606   0.1810
 ## Detection Prevalence   0.2845   0.1935   0.1744   0.1639   0.1838
-## Balanced Accuracy      0.9967   0.9922   0.9768   0.9885   0.9971
+## Balanced Accuracy      0.9933   0.9948   0.9825   0.9871   0.9983
 ```
 
 We see that we get a very high accuracy level using the Random Forest algorithm but we have to be careful that we are not overfitting. To check this we need to check the out of sample error for all three methods and choose the one with the lowest out of sample error. This is the reason i have split the training set into three subsets, so that we can apply the 2 best methods to the TRtest set and compare the Out of Sample Error. Now let us check the last prediction model.
 
-** Prediction with the Gradient Boosting Method**
+**Prediction with the Gradient Boosting Method**
 
 
 ```r
@@ -657,37 +657,37 @@ cMgbm
 ## 
 ##           Reference
 ## Prediction    A    B    C    D    E
-##          A 1092   11    6    6    1
-##          B   36  668   38   14    3
-##          C    0   37  634   13    0
-##          D    4   15   43  577    4
-##          E    3   22   18   15  663
+##          A 1090    2   11   12    1
+##          B   41  640   53   21    4
+##          C    5   48  616   15    0
+##          D   13   16   33  581    0
+##          E    4   11   17   10  679
 ## 
 ## Overall Statistics
 ##                                           
-##                Accuracy : 0.9263          
-##                  95% CI : (0.9177, 0.9343)
-##     No Information Rate : 0.2893          
+##                Accuracy : 0.9192          
+##                  95% CI : (0.9102, 0.9275)
+##     No Information Rate : 0.2939          
 ##     P-Value [Acc > NIR] : < 2.2e-16       
 ##                                           
-##                   Kappa : 0.9068          
-##  Mcnemar's Test P-Value : 3.594e-12       
+##                   Kappa : 0.8977          
+##  Mcnemar's Test P-Value : 1.618e-12       
 ## 
 ## Statistics by Class:
 ## 
 ##                      Class: A Class: B Class: C Class: D Class: E
-## Sensitivity            0.9621   0.8871   0.8579   0.9232   0.9881
-## Specificity            0.9914   0.9713   0.9843   0.9800   0.9822
-## Pos Pred Value         0.9785   0.8801   0.9269   0.8974   0.9196
-## Neg Pred Value         0.9847   0.9731   0.9676   0.9854   0.9975
-## Prevalence             0.2893   0.1919   0.1884   0.1593   0.1710
-## Detection Rate         0.2784   0.1703   0.1616   0.1471   0.1690
+## Sensitivity            0.9454   0.8926   0.8438   0.9092   0.9927
+## Specificity            0.9906   0.9629   0.9787   0.9811   0.9870
+## Pos Pred Value         0.9767   0.8432   0.9006   0.9036   0.9417
+## Neg Pred Value         0.9776   0.9757   0.9648   0.9823   0.9984
+## Prevalence             0.2939   0.1828   0.1861   0.1629   0.1744
+## Detection Rate         0.2778   0.1631   0.1570   0.1481   0.1731
 ## Detection Prevalence   0.2845   0.1935   0.1744   0.1639   0.1838
-## Balanced Accuracy      0.9768   0.9292   0.9211   0.9516   0.9851
+## Balanced Accuracy      0.9680   0.9277   0.9113   0.9452   0.9899
 ```
 
-The expected OSE for the three methods are: Tree:0.5737956, 
-rf:0.0147846, gbm: 0.0736681.
+The expected OSE for the three methods are: Tree:0.5717563, 
+rf:0.0135101, gbm: 0.0808055.
 From this preliminary OSE The Random Forest prediction model has the lowest Out Of Sample Error. 
 The final estimates for the OSE will be computed after we apply these 2 models on the TRtest.
 
@@ -701,33 +701,33 @@ cMfrf
 ## 
 ##           Reference
 ## Prediction    A    B    C    D    E
-##          A 1112    1    2    1    0
-##          B   11  734   10    4    0
-##          C    0   10  673    1    0
-##          D    1    1   18  622    1
-##          E    0    4    3    6  708
+##          A 1111    3    2    0    0
+##          B   12  739    6    2    0
+##          C    0    6  674    4    0
+##          D    0    0   15  626    2
+##          E    0    0    3    6  712
 ## 
 ## Overall Statistics
 ##                                           
-##                Accuracy : 0.9811          
-##                  95% CI : (0.9764, 0.9852)
-##     No Information Rate : 0.2865          
+##                Accuracy : 0.9845          
+##                  95% CI : (0.9801, 0.9881)
+##     No Information Rate : 0.2863          
 ##     P-Value [Acc > NIR] : < 2.2e-16       
 ##                                           
-##                   Kappa : 0.9761          
+##                   Kappa : 0.9803          
 ##  Mcnemar's Test P-Value : NA              
 ## 
 ## Statistics by Class:
 ## 
 ##                      Class: A Class: B Class: C Class: D Class: E
-## Sensitivity            0.9893   0.9787   0.9533   0.9811   0.9986
-## Specificity            0.9986   0.9921   0.9966   0.9936   0.9960
-## Pos Pred Value         0.9964   0.9671   0.9839   0.9673   0.9820
-## Neg Pred Value         0.9957   0.9949   0.9898   0.9963   0.9997
-## Prevalence             0.2865   0.1912   0.1800   0.1616   0.1807
-## Detection Rate         0.2835   0.1871   0.1716   0.1586   0.1805
+## Sensitivity            0.9893   0.9880   0.9629   0.9812   0.9972
+## Specificity            0.9982   0.9937   0.9969   0.9948   0.9972
+## Pos Pred Value         0.9955   0.9736   0.9854   0.9736   0.9875
+## Neg Pred Value         0.9957   0.9972   0.9920   0.9963   0.9994
+## Prevalence             0.2863   0.1907   0.1784   0.1626   0.1820
+## Detection Rate         0.2832   0.1884   0.1718   0.1596   0.1815
 ## Detection Prevalence   0.2845   0.1935   0.1744   0.1639   0.1838
-## Balanced Accuracy      0.9939   0.9854   0.9749   0.9873   0.9973
+## Balanced Accuracy      0.9938   0.9908   0.9799   0.9880   0.9972
 ```
 
 ```r
@@ -740,39 +740,39 @@ cMfgbm
 ## 
 ##           Reference
 ## Prediction    A    B    C    D    E
-##          A 1094   10    9    2    1
-##          B   40  655   43   17    4
-##          C    3   41  624   16    0
-##          D    4   14   34  589    2
-##          E    2   18   17   10  674
+##          A 1084    8   10   13    1
+##          B   47  643   47   17    5
+##          C    4   44  622   13    1
+##          D   12   14   32  583    2
+##          E    6   14   13   14  674
 ## 
 ## Overall Statistics
 ##                                           
-##                Accuracy : 0.9268          
-##                  95% CI : (0.9182, 0.9348)
-##     No Information Rate : 0.2914          
+##                Accuracy : 0.9192          
+##                  95% CI : (0.9102, 0.9275)
+##     No Information Rate : 0.2939          
 ##     P-Value [Acc > NIR] : < 2.2e-16       
 ##                                           
-##                   Kappa : 0.9074          
-##  Mcnemar's Test P-Value : 3.53e-09        
+##                   Kappa : 0.8977          
+##  Mcnemar's Test P-Value : 2.852e-10       
 ## 
 ## Statistics by Class:
 ## 
 ##                      Class: A Class: B Class: C Class: D Class: E
-## Sensitivity            0.9571   0.8875   0.8583   0.9290   0.9897
-## Specificity            0.9921   0.9673   0.9812   0.9836   0.9855
-## Pos Pred Value         0.9803   0.8630   0.9123   0.9160   0.9348
-## Neg Pred Value         0.9825   0.9738   0.9682   0.9863   0.9978
-## Prevalence             0.2914   0.1881   0.1853   0.1616   0.1736
-## Detection Rate         0.2789   0.1670   0.1591   0.1501   0.1718
+## Sensitivity            0.9402   0.8893   0.8591   0.9109   0.9868
+## Specificity            0.9884   0.9637   0.9806   0.9817   0.9855
+## Pos Pred Value         0.9713   0.8472   0.9094   0.9067   0.9348
+## Neg Pred Value         0.9754   0.9747   0.9685   0.9826   0.9972
+## Prevalence             0.2939   0.1843   0.1846   0.1631   0.1741
+## Detection Rate         0.2763   0.1639   0.1586   0.1486   0.1718
 ## Detection Prevalence   0.2845   0.1935   0.1744   0.1639   0.1838
-## Balanced Accuracy      0.9746   0.9274   0.9198   0.9563   0.9876
+## Balanced Accuracy      0.9643   0.9265   0.9199   0.9463   0.9862
 ```
 
-Out of Sample Error Estimates: rf:0.0188631, gbm: 0.0731583.
+Out of Sample Error Estimates: rf:0.0155493, gbm: 0.0808055.
 We can see that the most accurate model is the Random Forest model. We are going to use it to predict the class for the test set.
 
-# ** Test Predictions **
+# **Test Predictions **
 
 ```r
 predictrf <- predict(rf, testing)
@@ -800,9 +800,9 @@ table(predictrf,predictgbm)
 ##          predictgbm
 ## predictrf A B C D E
 ##         A 7 0 0 0 0
-##         B 0 6 1 1 0
+##         B 0 6 2 0 0
 ##         C 0 0 1 0 0
 ##         D 0 0 0 1 0
 ##         E 0 0 0 0 3
 ```
-We can see that the oredicted values differ in the B, C, D classes which tells that these three classes are the hardest to separate accurately. Nontheless both the algorithms created very good approximating models.
+We can see that the predicted values differ in the B, C, D classes which tells that these three classes are the hardest to separate accurately. Nonetheless both the algorithms created very good approximating models.
